@@ -5,7 +5,7 @@ from dataclasses import dataclass
 from typing import Any, ClassVar
 
 from fastapi import Request
-from fastapi.responses import JSONResponse, Response
+from fastapi.responses import Response
 from fhir.resources.bundle import Bundle
 from fhir.resources.operationoutcome import OperationOutcome
 from fhir.resources.resource import Resource
@@ -165,23 +165,32 @@ def format_response(
     if format_parameters.format == "application/fhir+json":
         if format_parameters.pretty:
             return Response(
-                content=resource.json(indent=2, separators=(", ", ": ")),
+                content=resource.json(
+                    ensure_ascii=False,
+                    allow_nan=False,
+                    indent=2,
+                    separators=(", ", ": "),
+                ),
                 status_code=status_code or status.HTTP_200_OK,
                 media_type=format_parameters.format,
             )
         else:
-            if status_code:
-                return JSONResponse(
-                    content=resource.dict(),
-                    status_code=status_code,
-                    media_type=format_parameters.format,
-                )
-            else:
+            if not status_code:
                 assert (
                     response is not None
                 ), "Response object or status code must be provided for non-pretty JSON responses"
-                response.headers["Content-Type"] = format_parameters.format
-                return resource
+                status_code = status.HTTP_200_OK
+
+            return Response(
+                content=resource.json(
+                    ensure_ascii=False,
+                    allow_nan=False,
+                    indent=None,
+                    separators=(",", ":"),
+                ),
+                status_code=status_code,
+                media_type=format_parameters.format,
+            )
     else:
         return Response(
             content=resource.xml(pretty_print=format_parameters.pretty),
